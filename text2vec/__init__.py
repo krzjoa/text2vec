@@ -1,4 +1,5 @@
 # coding=utf-8
 from .textModel import *
-from .textTranformer import *
+from .textTransformer import *
 from .tools import *
+
