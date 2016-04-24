@@ -1,68 +1,39 @@
 # coding=utf-8
 
-import aspell
-from pyMorfologik import Morfologik
-from pyMorfologik.parsing import ListParser
 import string
 import tools as t
-
-class Correct:
-    def __init__(self):
-        self.s = aspell.Speller(('lang','pl'),('master', '/home/krzysztof/Pulpit/Projekt/pl/pl.rws'))
-        
-    def correct(self,word):
-        suggested = self.s.suggest(word)
-        if len(suggested)>0:
-            return suggested[0]
-        else:
-            return '_UNK_'
-        
-    def suggest(self, word):
-        return self.s.suggest(word)
+import string
+import correct as c
+import morfologik as m
 
 class TextTransformer:
     def __init__(self):
-        self.parser = ListParser()
-        self.stemmer = Morfologik()
-        self.c = Correct()
-     
+        self.morfo = m.Morfo()
+        self.c = c.Correct()
+            
     def transform(self,rawDocuments):
         allPostags = []
         allUnknown = []
         allLemmas = []
         allMarkers = []
-        documents = [[i.encode('utf-8').lower()] for i in rawDocuments]
-        for j in documents:
-            postags, unknown, lemmas = self._transformDocument(j)
+        documents = [self._preprocess(i) for i in rawDocuments]
+        for j, k in zip(documents, rawDocuments):
+            postags, unknown, lemmas = self.morfo.lemmPostag(j)
             allPostags.append(postags)
             allUnknown.append(unknown)
             allLemmas.append(lemmas)
-            allMarkers.append(self._getMarkers(j[0]))
+            allMarkers.append(self._getMarkers(k.encode('utf-8')))
         return allPostags, allUnknown, allLemmas, allMarkers
     
-    def _transformDocument(self,comment):
-        postags = []
-        unknown = []
-        lemmas = []
-        posTagLemm = self.stemmer.stem(comment,self.parser)
-        for i in posTagLemm:
-            x = i[1].values()
-            z =i[1].keys()
-            if len(x)>0:
-                postags.append(x[0][0])
-                lemmas.append(z[0])
-            else:
-                postags.append('_UNK_')
-                lemmas.append('_UNK_')
-                unknown.append(i[0])
-        return postags, unknown, lemmas
-    
+   
     def _getMarkers(self,text):
-        """ Kolejno: liczba wielokropków, uppercase'ów i ciągów ??!!!??? """
-        markers = [0,0,0]
+        """ Kolejno: liczba wielokropków, uppercase'ów, ciągów ??!!!??? oraz ciągi w cudzysłowie"""
+        markers = [0,0,0,0]
         markers[0]= t.countDotted(text)
         markers[1] = t.countEmot(text)
         markers[2] = t.countUpper(text)
+        markers[3] = t.countQuot(text)
+        return markers
         
     def autocorrect(self,documents):
 		allLemmas = [document.lemmas for document in documents]
@@ -79,19 +50,28 @@ class TextTransformer:
     def _docCorrect(self, postags, unknown, lemmas):
         newLemmas = lemmas
         newPostags = postags
-        newUnknown = unknown
+        newUnknown = []
         emendationLogs = []
-        print lemmas, postags, unknown
         for index, word in enumerate(unknown):
             corrected = self.c.correct(word.encode('utf-8'))
+            print word, corrected
             if corrected != '_UNK_':
-                newPostag = self.stemmer.stem([corrected], self.parser)[0][1].values()
-                newLemma = self.stemmer.stem([corrected], self.parser)[0][1].keys()
-                print word, corrected
+                postag, lemma, unk = self.morfo.lemmPostag(corrected)
                 emendationLogs.append((word,corrected))
-                if len(newPostag)>0:
-                    newPostags[newPostags.index('_UNK_')] = newPostag[0][0]
-                    newLemmas[newLemmas.index('_UNK_')] = newLemma[0]
-                    del newUnknown[index]
-        print emendationLogs            
+                if len(postag)>0:
+                    newPostags[newPostags.index('_UNK_')] = postag
+                    newLemmas[newLemmas.index('_UNK_')] = lemma
+            else:
+			   newUnknown.append(word)           
         return newPostags, newUnknown, newLemmas, emendationLogs
+        
+    def _preprocess(self,text):
+		i = text.encode('utf').lower()
+		i = i.replace("."," ").translate(string.maketrans("",""), string.punctuation)
+		return i   
+		
+
+
+        
+		 
+		    

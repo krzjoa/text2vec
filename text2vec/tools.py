@@ -28,3 +28,6 @@ def countEmot(text):
 	"""Counts number of substrings containig ! or ? """
 	return len(re.findall('[!,?]{2,}',text))
 
+def countQuot(text):
+	""" Counts number of substrings between quotation marks """
+	return len(re.findall('"\w*"',text))
